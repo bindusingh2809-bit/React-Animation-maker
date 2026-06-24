@@ -21,7 +21,9 @@ export interface CharacterDef {
   id: string;
   label: string;            // Display name shown in the UI
   icon: string;             // Emoji icon for character selector
+  thumbnailUrl: string;     // Preview image shown in the character picker card
   armatureName: string;     // must match armature[0].name in the ske.json
+  dragonBonesName: string;  // top-level "name" field in the ske.json — used to namespace factory lookups
   skeUrl: string;
   texUrl: string;
   imgUrl: string;
@@ -32,7 +34,14 @@ export interface CharacterDef {
   animationGroups: Array<{
     label: string;
     color: string;
-    animations: Array<{ name: string; icon: string }>;
+    animations: Array<{
+      name: string;
+      icon: string;
+      /** Human-readable label; falls back to name if omitted */
+      label?: string;
+      /** Override which CHARACTER_DEFS entry to load for this specific animation */
+      characterId?: string;
+    }>;
   }>;
 }
 
@@ -41,7 +50,9 @@ export const CHARACTER_DEFS: Record<string, CharacterDef> = {
     id: "character",
     label: "Xter",
     icon: "🧑",
+    thumbnailUrl: `${_BASE}/dragonbones/characte_2_tex.png`,
     armatureName: "character",
+    dragonBonesName: "character",
     skeUrl: `${_BASE}/dragonbones/characte_2_ske.json`,
     texUrl: `${_BASE}/dragonbones/characte_2_tex.json`,
     imgUrl: `${_BASE}/dragonbones/characte_2_tex.png`,
@@ -67,66 +78,57 @@ export const CHARACTER_DEFS: Record<string, CharacterDef> = {
           { name: "point",      icon: "👉" },
           { name: "nod",        icon: "🙂" },
           { name: "shake_head", icon: "🙅" },
+          { name: "look_up",    icon: "👀" },
         ],
       },
       {
-        label: "Posture",
+        label: "Sitting & Rest",
         color: "#8b5cf6",
         animations: [
-          { name: "sit_down", icon: "🪑" },
-          { name: "sit_idle", icon: "😌" },
+          { name: "sit_down",       icon: "🪑" },
+          { name: "sit_idle",       icon: "😌" },
+          { name: "cross_legs",     icon: "🧘" },
+          { name: "swing_legs_out", icon: "🦵" },
+          { name: "lay_down",       icon: "🛌" },
+          { name: "pull_blanket",   icon: "🛏️" },
+          { name: "fall_asleep",    icon: "😴" },
         ],
       },
-    ],
-  },
-
-  sittingxter: {
-    id: "sittingxter",
-    label: "Sitting Xter",
-    icon: "🪑",
-    armatureName: "Armature",
-    skeUrl: `${_BASE}/dragonbones/sittingxter/sittingxter_ske.json`,
-    texUrl: `${_BASE}/dragonbones/sittingxter/sittingxter_tex.json`,
-    imgUrl: `${_BASE}/dragonbones/sittingxter/sittingxter_tex.png`,
-    dbHeight: 620,
-    dbWidth: 420,
-    animationGroups: [
       {
-        label: "Sitting",
+        label: "Morning Routine",
         color: "#f97316",
         animations: [
-          { name: "animtion0", icon: "🪑" },
+          { name: "yawn",    icon: "🥱" },
+          { name: "stretch", icon: "🙆" },
+          { name: "rub_eyes", icon: "😪" },
         ],
       },
-    ],
-  },
-
-  swimmingxter: {
-    id: "swimmingxter",
-    label: "Swimming Xter",
-    icon: "🏊",
-    armatureName: "Armature",
-    skeUrl: `${_BASE}/dragonbones/swimmingxter/swimmingxter_ske.json`,
-    texUrl: `${_BASE}/dragonbones/swimmingxter/swimmingxter_tex.json`,
-    imgUrl: `${_BASE}/dragonbones/swimmingxter/swimmingxter_tex.png`,
-    dbHeight: 700,
-    dbWidth: 520,
-    animationGroups: [
       {
-        label: "Swimming",
-        color: "#06b6d4",
+        label: "Activities",
+        color: "#10b981",
         animations: [
-          { name: "animtion0", icon: "🏊" },
+          { name: "eat",          icon: "🍽️" },
+          { name: "drink",        icon: "🥤" },
+          { name: "flip_food",    icon: "🍳" },
+          { name: "wipe_table",   icon: "🧹" },
+          { name: "read_book",    icon: "📖" },
+          { name: "desk_stretch", icon: "💺" },
+          { name: "pick_up_box",  icon: "📦" },
+          { name: "put_on_shirt", icon: "👕" },
         ],
       },
     ],
   },
 
-  jumpxter: {
-    id: "jumpxter",
-    label: "Jumping Xter",
-    icon: "🦘",
+  // ── Xter 2: jump / sit / swim — each animation lives in its own skeleton ──
+  xter2: {
+    id: "xter2",
+    label: "Xter 2",
+    icon: "🏃",
+    thumbnailUrl: `${_BASE}/dragonbones/jumpxter/JUmp_tex.png`,
+    // armatureName / skeUrl / etc. are per-animation via characterId override below
     armatureName: "Armature",
+    dragonBonesName: "JUmp",
     skeUrl: `${_BASE}/dragonbones/jumpxter/JUmp_ske.json`,
     texUrl: `${_BASE}/dragonbones/jumpxter/JUmp_tex.json`,
     imgUrl: `${_BASE}/dragonbones/jumpxter/JUmp_tex.png`,
@@ -134,13 +136,62 @@ export const CHARACTER_DEFS: Record<string, CharacterDef> = {
     dbWidth: 420,
     animationGroups: [
       {
-        label: "Jumping",
+        label: "Actions",
         color: "#ec4899",
         animations: [
-          { name: "animtion0", icon: "🦘" },
+          { name: "animtion0", label: "Jump",  icon: "🦘", characterId: "jumpxter" },
+          { name: "animtion0", label: "Sit",   icon: "🪑", characterId: "sittingxter" },
+          { name: "animtion0", label: "Swim",  icon: "🏊", characterId: "swimmingxter" },
         ],
       },
     ],
+  },
+
+  // ── The 3 separate skeleton files below are kept for loadCharacter() internals ──
+  // They are NOT shown in the UI — xter2 above merges them visually.
+  sittingxter: {
+    id: "sittingxter",
+    label: "Sitting Xter",
+    icon: "🪑",
+    thumbnailUrl: `${_BASE}/dragonbones/sittingxter/sittingxter_tex.png`,
+    armatureName: "Armature",
+    dragonBonesName: "sittingxter",
+    skeUrl: `${_BASE}/dragonbones/sittingxter/sittingxter_ske.json`,
+    texUrl: `${_BASE}/dragonbones/sittingxter/sittingxter_tex.json`,
+    imgUrl: `${_BASE}/dragonbones/sittingxter/sittingxter_tex.png`,
+    dbHeight: 620,
+    dbWidth: 420,
+    animationGroups: [],
+  },
+
+  swimmingxter: {
+    id: "swimmingxter",
+    label: "Swimming Xter",
+    icon: "🏊",
+    thumbnailUrl: `${_BASE}/dragonbones/swimmingxter/swimmingxter_tex.png`,
+    armatureName: "Armature",
+    dragonBonesName: "swimmingxter",
+    skeUrl: `${_BASE}/dragonbones/swimmingxter/swimmingxter_ske.json`,
+    texUrl: `${_BASE}/dragonbones/swimmingxter/swimmingxter_tex.json`,
+    imgUrl: `${_BASE}/dragonbones/swimmingxter/swimmingxter_tex.png`,
+    dbHeight: 700,
+    dbWidth: 520,
+    animationGroups: [],
+  },
+
+  jumpxter: {
+    id: "jumpxter",
+    label: "Jumping Xter",
+    icon: "🦘",
+    thumbnailUrl: `${_BASE}/dragonbones/jumpxter/JUmp_tex.png`,
+    armatureName: "Armature",
+    dragonBonesName: "JUmp",
+    skeUrl: `${_BASE}/dragonbones/jumpxter/JUmp_ske.json`,
+    texUrl: `${_BASE}/dragonbones/jumpxter/JUmp_tex.json`,
+    imgUrl: `${_BASE}/dragonbones/jumpxter/JUmp_tex.png`,
+    dbHeight: 1105,
+    dbWidth: 420,
+    animationGroups: [],
   },
 };
 
@@ -270,8 +321,9 @@ export async function loadCharacter(
   const def = CHARACTER_DEFS[characterId];
   const factory = PixiFactory.factory;
   const armatureName = def.armatureName;
+  const dragonBonesName = def.dragonBonesName;
 
-  const display = factory.buildArmatureDisplay(armatureName);
+  const display = factory.buildArmatureDisplay(armatureName, dragonBonesName);
   if (!display) throw new Error(`[DragonBones] Could not build armature: ${armatureName} (characterId=${characterId})`);
 
   (display as any).debugDraw = false;

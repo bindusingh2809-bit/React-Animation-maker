@@ -1045,7 +1045,7 @@ export function CanvasEditor() {
 
         addTrack({
           id: objId,
-          name: objAsset.name,
+          name: (objAsset as any).displayName ?? objAsset.name,
           fabricObject: obj,
           startTime: 0,
           endTime: 5,
@@ -2081,13 +2081,15 @@ export function CanvasEditor() {
     (window as any).__addTextToCanvas = addTextToCanvas;
     (window as any).__removeBackground = removeBackground;
     (window as any).__addShapeToCanvas = addAssetToCanvas;
+    (window as any).__addAssetToCanvas = addAssetToCanvas;
     return () => {
       delete (window as any).__setBackground;
       delete (window as any).__addTextToCanvas;
       delete (window as any).__removeBackground;
       delete (window as any).__addShapeToCanvas;
+      delete (window as any).__addAssetToCanvas;
     };
-  }, [setBackground, addTextToCanvas, removeBackground]);
+  }, [setBackground, addTextToCanvas, removeBackground, addAssetToCanvas]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {

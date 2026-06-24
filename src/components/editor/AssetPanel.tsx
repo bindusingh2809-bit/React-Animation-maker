@@ -458,13 +458,13 @@ function CharactersTab({
   handleAssetTap: (asset: Asset) => void;
   propGroups: Array<{ label: string; color: string; assets: Asset[] }>;
 }) {
-  const charIds = Object.keys(CHARACTER_DEFS);
-  const [selectedCharId, setSelectedCharId] = useState(charIds[0]);
+  // Only show characters that have animationGroups defined (internal-only entries have empty arrays)
+  const charIds = Object.keys(CHARACTER_DEFS).filter(
+    (id) => CHARACTER_DEFS[id].animationGroups.length > 0
+  );
+  const [selectedCharId, setSelectedCharId] = useState<string | null>(null);
 
-  const def = CHARACTER_DEFS[selectedCharId];
-
-  // Colour palette cycling for the character selector buttons
-  const charColors = ["#6366f1", "#f97316", "#06b6d4", "#ec4899"];
+  const selectedDef = selectedCharId ? CHARACTER_DEFS[selectedCharId] : null;
 
   return (
     <div className="flex flex-col h-full">
@@ -501,87 +501,139 @@ function CharactersTab({
           </div>
         ))}
 
-        {/* Character selector */}
+        {/* ── Character picker ── */}
         <div>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
             <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-400">Characters</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            {charIds.map((cid, idx) => {
-              const d = CHARACTER_DEFS[cid];
-              const color = charColors[idx % charColors.length];
-              const isActive = cid === selectedCharId;
-              return (
-                <button
-                  key={cid}
-                  onClick={() => setSelectedCharId(cid)}
-                  className={cn(
-                    "flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all select-none",
-                    isActive
-                      ? "shadow-md"
-                      : "opacity-60 hover:opacity-90"
-                  )}
-                  style={{
-                    backgroundColor: color + (isActive ? "22" : "0d"),
-                    borderColor: isActive ? color : color + "44",
-                  }}
-                >
-                  <span className="text-2xl leading-none">{d.icon}</span>
-                  <div className="flex-1 min-w-0 text-left">
-                    <p className="text-[11px] font-semibold leading-tight truncate" style={{ color }}>{d.label}</p>
-                    <p className="text-[9px] text-muted-foreground mt-0.5">
-                      {d.animationGroups.reduce((s, g) => s + g.animations.length, 0)} animations
-                    </p>
-                  </div>
-                  {isActive && (
-                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                  )}
-                </button>
-              );
-            })}
+            {selectedCharId && (
+              <button
+                onClick={() => setSelectedCharId(null)}
+                className="ml-auto text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                ← back
+              </button>
+            )}
           </div>
 
-          {/* Animation groups for selected character */}
-          <div className="space-y-4">
-            {def.animationGroups.map((group) => (
-              <div key={group.label}>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: group.color }} />
-                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: group.color }}>{group.label}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {group.animations.map((anim) => {
-                    const asset: Asset = {
-                      id: `char-${selectedCharId}-${anim.name}`,
-                      name: anim.name,
-                      type: "character",
-                      icon: anim.icon,
-                      color: group.color,
-                      // pass characterId so CanvasEditor knows which DragonBones set to load
-                      characterId: selectedCharId,
-                    } as any;
-                    return (
-                      <div
-                        key={anim.name}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, asset)}
-                        onClick={() => handleAssetTap(asset)}
-                        className="group flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer active:scale-95 transition-all select-none touch-manipulation"
-                        style={{ backgroundColor: group.color + "0d", borderColor: group.color + "33" }}
-                      >
-                        <div className="w-9 h-9 rounded-md flex items-center justify-center text-xl shrink-0" style={{ backgroundColor: group.color + "22" }}>{anim.icon}</div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] font-medium leading-tight truncate capitalize" style={{ color: group.color }}>{anim.name.replace(/_/g, " ")}</p>
-                          <p className="text-[9px] text-muted-foreground mt-0.5">tap to add</p>
-                        </div>
+          {/* Character thumbnail grid — hidden once one is selected */}
+          {!selectedCharId && (
+            <div className="grid grid-cols-2 gap-3">
+              {charIds.map((cid) => {
+                const d = CHARACTER_DEFS[cid];
+                return (
+                  <button
+                    key={cid}
+                    onClick={() => setSelectedCharId(cid)}
+                    className="group relative flex flex-col rounded-xl border-2 border-panel-border hover:border-indigo-500/60 bg-secondary/30 hover:bg-secondary/60 overflow-hidden transition-all active:scale-95 select-none touch-manipulation"
+                  >
+                    {/* Thumbnail image */}
+                    <div className="w-full aspect-square bg-black/20 overflow-hidden flex items-center justify-center">
+                      <img
+                        src={d.thumbnailUrl}
+                        alt={d.label}
+                        className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          // fallback to emoji if image fails
+                          (e.currentTarget as HTMLImageElement).style.display = "none";
+                          const parent = e.currentTarget.parentElement!;
+                          if (!parent.querySelector(".emoji-fallback")) {
+                            const span = document.createElement("span");
+                            span.className = "emoji-fallback text-4xl";
+                            span.textContent = d.icon;
+                            parent.appendChild(span);
+                          }
+                        }}
+                      />
+                    </div>
+                    {/* Label bar */}
+                    <div className="px-2 py-1.5 flex items-center justify-between w-full">
+                      <div className="text-left min-w-0">
+                        <p className="text-[11px] font-semibold text-foreground truncate">{d.label}</p>
+                        <p className="text-[9px] text-muted-foreground">
+                          {d.animationGroups.reduce((s, g) => s + g.animations.length, 0)} animations
+                        </p>
                       </div>
-                    );
-                  })}
+                      <svg className="w-3 h-3 text-muted-foreground shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Animation list for the selected character */}
+          {selectedCharId && selectedDef && (
+            <div className="space-y-4">
+              {/* Selected character mini-header */}
+              <div className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/40 border border-panel-border">
+                <div className="w-12 h-12 rounded-lg bg-black/20 overflow-hidden shrink-0 flex items-center justify-center">
+                  <img
+                    src={selectedDef.thumbnailUrl}
+                    alt={selectedDef.label}
+                    className="w-full h-full object-contain p-0.5"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = "none";
+                      const parent = e.currentTarget.parentElement!;
+                      if (!parent.querySelector(".emoji-fallback")) {
+                        const span = document.createElement("span");
+                        span.className = "emoji-fallback text-2xl";
+                        span.textContent = selectedDef.icon;
+                        parent.appendChild(span);
+                      }
+                    }}
+                  />
+                </div>
+                <div>
+                  <p className="text-[12px] font-semibold text-foreground">{selectedDef.label}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {selectedDef.animationGroups.reduce((s, g) => s + g.animations.length, 0)} animations available
+                  </p>
                 </div>
               </div>
-            ))}
-          </div>
+
+              {selectedDef.animationGroups.map((group) => (
+                <div key={group.label}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: group.color }} />
+                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: group.color }}>{group.label}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {group.animations.map((anim) => {
+                      const asset: Asset = {
+                        id: `char-${anim.characterId ?? selectedCharId}-${anim.name}`,
+                        name: anim.name,  // MUST be the real DragonBones animation key
+                        type: "character",
+                        icon: anim.icon,
+                        color: group.color,
+                        characterId: anim.characterId ?? selectedCharId,
+                        ...(anim.label ? { displayName: anim.label } : {}),
+                      } as any;
+                      const displayName = (anim.label ?? anim.name).replace(/_/g, " ");
+                      return (
+                        <div
+                          key={`${anim.characterId ?? selectedCharId}-${anim.name}`}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, asset)}
+                          onClick={() => handleAssetTap(asset)}
+                          className="group flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer active:scale-95 transition-all select-none touch-manipulation"
+                          style={{ backgroundColor: group.color + "0d", borderColor: group.color + "33" }}
+                        >
+                          <div className="w-9 h-9 rounded-md flex items-center justify-center text-xl shrink-0" style={{ backgroundColor: group.color + "22" }}>{anim.icon}</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-medium leading-tight truncate capitalize" style={{ color: group.color }}>{displayName}</p>
+                            <p className="text-[9px] text-muted-foreground mt-0.5">tap to add</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
       </div>
