@@ -34,7 +34,7 @@ import { AudioFilterPanel } from "./AudioFilterPanel";
 import { PathDrawOverlay } from "./PathDrawOverlay";
 import { PropActionPopup } from "./PropActionPopup";
 import { BackgroundCropModal } from "./BackgroundCropModal";
-import { loadCharacter, loadProp, hookPixiTicker } from "@/lib/dragonbonesRenderer";
+import { loadCharacter, loadProp, hookPixiTicker, CHARACTER_DEFS, DEFAULT_CHARACTER_ID } from "@/lib/dragonbonesRenderer";
 import { createAnimatedGif, AnimatedGifImage } from "@/utils/gifRenderer";
 
 (window as any).PIXI = PIXI;
@@ -851,10 +851,12 @@ export function CanvasEditor() {
               continue;
             }
 
-            const { display } = await loadCharacter(pa.assetName);
+            const restoreCharId = (pa as any).characterId ?? DEFAULT_CHARACTER_ID;
+            const restoreCharDef = CHARACTER_DEFS[restoreCharId] ?? CHARACTER_DEFS[DEFAULT_CHARACTER_ID];
+            const { display } = await loadCharacter(pa.assetName, restoreCharId);
 
-            const CHAR_DB_HEIGHT = 945;
-            const CHAR_DB_WIDTH  = 324;
+            const CHAR_DB_HEIGHT = restoreCharDef.dbHeight;
+            const CHAR_DB_WIDTH  = restoreCharDef.dbWidth;
             const targetHeight   = 300;
             const dbScale        = targetHeight / CHAR_DB_HEIGHT;
             const charW          = Math.round(CHAR_DB_WIDTH * dbScale);
@@ -1202,13 +1204,14 @@ export function CanvasEditor() {
           addObjectToCanvas(obj, id, asset);
         }
     } else if (asset.type === "character") {
-      // DragonBones AABB for this character: ~324w × 945h (feet at y=0)
-      // Target: fit 300px tall on the 960×540 canvas
-      const CHAR_DB_HEIGHT = 945;
-      const CHAR_DB_WIDTH  = 324;
+      // Resolve character definition (supports multi-character via characterId)
+      const charId = (asset as any).characterId ?? DEFAULT_CHARACTER_ID;
+      const charDef = CHARACTER_DEFS[charId] ?? CHARACTER_DEFS[DEFAULT_CHARACTER_ID];
+      const CHAR_DB_HEIGHT = charDef.dbHeight;
+      const CHAR_DB_WIDTH  = charDef.dbWidth;
       const targetHeight   = 300;
       const dbScale        = targetHeight / CHAR_DB_HEIGHT;
-      const charW          = Math.round(CHAR_DB_WIDTH * dbScale);  // ≈103px
+      const charW          = Math.round(CHAR_DB_WIDTH * dbScale);
       const charH          = targetHeight;
 
       // Semi-transparent proxy rect so the user can see/select/move the character.
@@ -1228,6 +1231,7 @@ export function CanvasEditor() {
       });
       (proxy as any)._proxyStroke = "rgba(100,100,255,0.5)";
       (proxy as any)._proxyFill   = "rgba(100,100,255,0.08)";
+      (proxy as any)._characterId = charId;
       addObjectToCanvas(proxy, id, asset);
 
       (async () => {
@@ -1238,8 +1242,8 @@ export function CanvasEditor() {
             return;
           }
 
-          // loadCharacter handles singleton factory — safe to call multiple times
-          const { display } = await loadCharacter(asset.name);
+          // loadCharacter handles per-character factory — safe to call multiple times
+          const { display } = await loadCharacter(asset.name, charId);
 
           display.scale.set(dbScale);
           // DragonBones origin (y=0) is at the feet; offset down by charH

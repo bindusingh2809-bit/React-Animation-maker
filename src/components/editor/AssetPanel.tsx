@@ -38,6 +38,8 @@ import {
 type PanelTab = "elements" | "text" | "media" | "characters" | "draw" | "scenes";
 
 // ─── Character / Prop data ────────────────────────────────────────────────────
+import { CHARACTER_DEFS } from "@/lib/dragonbonesRenderer";
+
 type CharacterGroup = { label: string; color: string; assets: Asset[] };
 
 const propGroups: CharacterGroup[] = [
@@ -49,40 +51,6 @@ const propGroups: CharacterGroup[] = [
     ],
   },
 ];
-
-const characterGroups: CharacterGroup[] = [
-  {
-    label: "Locomotion",
-    color: "#6366f1",
-    assets: [
-      { id: "char-idle", name: "Idle", type: "character", icon: "🧍", color: "#6366f1" },
-      { id: "char-walk", name: "walk", type: "character", icon: "🚶", color: "#22c55e" },
-      { id: "char-run",  name: "run",  type: "character", icon: "🏃", color: "#f97316" },
-      { id: "char-jump", name: "jump", type: "character", icon: "🦘", color: "#ec4899" },
-    ],
-  },
-  {
-    label: "Gestures",
-    color: "#06b6d4",
-    assets: [
-      { id: "char-wave",       name: "wave",       type: "character", icon: "👋", color: "#06b6d4" },
-      { id: "char-handshake",  name: "handshake",  type: "character", icon: "🤝", color: "#06b6d4" },
-      { id: "char-point",      name: "point",      type: "character", icon: "👉", color: "#06b6d4" },
-      { id: "char-nod",        name: "nod",        type: "character", icon: "🙂", color: "#06b6d4" },
-      { id: "char-shake_head", name: "shake_head", type: "character", icon: "🙅", color: "#06b6d4" },
-    ],
-  },
-  {
-    label: "Posture",
-    color: "#8b5cf6",
-    assets: [
-      { id: "char-sit_down", name: "sit_down", type: "character", icon: "🪑", color: "#8b5cf6" },
-      { id: "char-sit_idle", name: "sit_idle", type: "character", icon: "😌", color: "#8b5cf6" },
-    ],
-  },
-];
-
-const characterAssets: Asset[] = characterGroups.flatMap(g => g.assets);
 
 // ─── Shape definitions ────────────────────────────────────────────────────────
 const SHAPE_GROUPS = [
@@ -480,6 +448,147 @@ function ShapesPanel() {
   );
 }
 
+// ─── CharactersTab ────────────────────────────────────────────────────────────
+function CharactersTab({
+  handleDragStart,
+  handleAssetTap,
+  propGroups,
+}: {
+  handleDragStart: (e: React.DragEvent, asset: Asset) => void;
+  handleAssetTap: (asset: Asset) => void;
+  propGroups: Array<{ label: string; color: string; assets: Asset[] }>;
+}) {
+  const charIds = Object.keys(CHARACTER_DEFS);
+  const [selectedCharId, setSelectedCharId] = useState(charIds[0]);
+
+  const def = CHARACTER_DEFS[selectedCharId];
+
+  // Colour palette cycling for the character selector buttons
+  const charColors = ["#6366f1", "#f97316", "#06b6d4", "#ec4899"];
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="p-4 border-b border-panel-border">
+        <h2 className="font-semibold text-foreground">Characters &amp; Props</h2>
+        <p className="text-xs text-muted-foreground mt-1">Tap to add · drag on desktop</p>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-5">
+
+        {/* Props section — unchanged */}
+        {propGroups.map((group) => (
+          <div key={group.label}>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: group.color }} />
+              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: group.color }}>{group.label}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {group.assets.map((asset) => (
+                <div key={asset.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, asset)}
+                  onClick={() => handleAssetTap(asset)}
+                  className="group flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer active:scale-95 transition-all select-none touch-manipulation"
+                  style={{ backgroundColor: (asset.color ?? "#6366f1") + "0d", borderColor: (asset.color ?? "#6366f1") + "33" }}
+                >
+                  <div className="w-9 h-9 rounded-md flex items-center justify-center text-xl shrink-0" style={{ backgroundColor: (asset.color ?? "#6366f1") + "22" }}>{asset.icon}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-medium leading-tight truncate capitalize" style={{ color: asset.color ?? "#e2e8f0" }}>{asset.name.replace(/_/g, " ")}</p>
+                    <p className="text-[9px] text-muted-foreground mt-0.5">tap to add</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {/* Character selector */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-400">Characters</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {charIds.map((cid, idx) => {
+              const d = CHARACTER_DEFS[cid];
+              const color = charColors[idx % charColors.length];
+              const isActive = cid === selectedCharId;
+              return (
+                <button
+                  key={cid}
+                  onClick={() => setSelectedCharId(cid)}
+                  className={cn(
+                    "flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all select-none",
+                    isActive
+                      ? "shadow-md"
+                      : "opacity-60 hover:opacity-90"
+                  )}
+                  style={{
+                    backgroundColor: color + (isActive ? "22" : "0d"),
+                    borderColor: isActive ? color : color + "44",
+                  }}
+                >
+                  <span className="text-2xl leading-none">{d.icon}</span>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-[11px] font-semibold leading-tight truncate" style={{ color }}>{d.label}</p>
+                    <p className="text-[9px] text-muted-foreground mt-0.5">
+                      {d.animationGroups.reduce((s, g) => s + g.animations.length, 0)} animations
+                    </p>
+                  </div>
+                  {isActive && (
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Animation groups for selected character */}
+          <div className="space-y-4">
+            {def.animationGroups.map((group) => (
+              <div key={group.label}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: group.color }} />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: group.color }}>{group.label}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {group.animations.map((anim) => {
+                    const asset: Asset = {
+                      id: `char-${selectedCharId}-${anim.name}`,
+                      name: anim.name,
+                      type: "character",
+                      icon: anim.icon,
+                      color: group.color,
+                      // pass characterId so CanvasEditor knows which DragonBones set to load
+                      characterId: selectedCharId,
+                    } as any;
+                    return (
+                      <div
+                        key={anim.name}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, asset)}
+                        onClick={() => handleAssetTap(asset)}
+                        className="group flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer active:scale-95 transition-all select-none touch-manipulation"
+                        style={{ backgroundColor: group.color + "0d", borderColor: group.color + "33" }}
+                      >
+                        <div className="w-9 h-9 rounded-md flex items-center justify-center text-xl shrink-0" style={{ backgroundColor: group.color + "22" }}>{anim.icon}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-medium leading-tight truncate capitalize" style={{ color: group.color }}>{anim.name.replace(/_/g, " ")}</p>
+                          <p className="text-[9px] text-muted-foreground mt-0.5">tap to add</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 // ─── AssetPanel ───────────────────────────────────────────────────────────────
 export function AssetPanel() {
   const [isOpen, setIsOpen] = useState(true);
@@ -794,39 +903,11 @@ export function AssetPanel() {
 
         {/* CHARACTERS */}
         {activeTab === "characters" && (
-          <div className="flex flex-col h-full">
-            <div className="p-4 border-b border-panel-border">
-              <h2 className="font-semibold text-foreground">Characters &amp; Props</h2>
-              <p className="text-xs text-muted-foreground mt-1">Tap to add · drag on desktop</p>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-5">
-              {[...propGroups, ...characterGroups].map((group) => (
-                <div key={group.label}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: group.color }} />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: group.color }}>{group.label}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {group.assets.map((asset) => (
-                      <div key={asset.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, asset)}
-                        onClick={() => handleAssetTap(asset)}
-                        className="group flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer active:scale-95 transition-all select-none touch-manipulation"
-                        style={{ backgroundColor: (asset.color ?? "#6366f1") + "0d", borderColor: (asset.color ?? "#6366f1") + "33" }}
-                      >
-                        <div className="w-9 h-9 rounded-md flex items-center justify-center text-xl shrink-0" style={{ backgroundColor: (asset.color ?? "#6366f1") + "22" }}>{asset.icon}</div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] font-medium leading-tight truncate capitalize" style={{ color: asset.color ?? "#e2e8f0" }}>{asset.name.replace(/_/g, " ")}</p>
-                          <p className="text-[9px] text-muted-foreground mt-0.5">tap to add</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <CharactersTab
+            handleDragStart={handleDragStart}
+            handleAssetTap={handleAssetTap}
+            propGroups={propGroups}
+          />
         )}
 
     </div>
